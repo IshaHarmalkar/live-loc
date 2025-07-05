@@ -5,7 +5,6 @@ import {
   Tooltip,
   useMap,
   Popup,
-  useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -49,12 +48,18 @@ export default function MapView({ myLocation, otherUsers }) {
 
       {myLocation && (
         <Marker position={myLocation}>
+          <Tooltip permanent direction="top" offset={[0, -10]}>
+            📍 You ({myLocation.name})
+          </Tooltip>
           <Popup>📍 You ({myLocation.name})</Popup>
         </Marker>
       )}
 
       {otherUsers.map((user, i) => (
         <Marker key={i} position={{ lat: user.lat, lng: user.lng }}>
+          <Tooltip permanent direction="top" offset={[0, -10]}>
+            👤 {user.name}
+          </Tooltip>
           <Popup>👤 {user.name}</Popup>
         </Marker>
       ))}

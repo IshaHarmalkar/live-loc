@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import ActiveUsersList from "./ActiveUsersList";
 import {
   collection,
   doc,
@@ -23,7 +24,7 @@ export default function LocationSharer() {
   const [name, setName] = useState(localStorage.getItem("name") || "");
   const [isSharing, setIsSharing] = useState(false);
   const [location, setLocation] = useState(null);
-  const [allUsers, setAllUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState({});
   const watchIdRef = useRef(null);
 
   // Save name if not set
@@ -66,10 +67,10 @@ export default function LocationSharer() {
   // Listen for all active users
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "locations"), (snap) => {
-      const users = [];
+      const users = {};
       snap.forEach((doc) => {
         if (doc.id !== name) {
-          users.push(doc.data());
+          users[doc.id] = doc.data();
         }
       });
       setAllUsers(users);
@@ -97,7 +98,15 @@ export default function LocationSharer() {
             {isSharing ? "⛔ Stop Sharing" : "📡 Start Sharing"}
           </button>
 
-          <MapView myLocation={location} otherUsers={allUsers} />
+          <div style={{ display: "flex", marginTop: "1rem" }}>
+            <div style={{ flex: 1 }}>
+              <MapView
+                myLocation={location}
+                otherUsers={Object.values(allUsers)}
+              />
+            </div>
+            <ActiveUsersList users={allUsers} />
+          </div>
         </div>
       )}
     </div>

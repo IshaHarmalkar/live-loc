@@ -1,83 +1,105 @@
-// src/components/LocationSharer.jsx
-import { useEffect, useState } from "react";
-import MapView from "./MapView";
-import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { useState, useEffect, useRef } from "react";
+import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "../firebase";
+import MapView from "./MapView";
+
+// Name generator fallback
+function generateName() {
+  const animals = ["Panda", "Lion", "Fox", "Dolphin", "Eagle", "Otter"];
+  return (
+    animals[Math.floor(Math.random() * animals.length)] +
+    "-" +
+    Math.floor(Math.random() * 1000)
+  );
+}
 
 export default function LocationSharer() {
-  const [userId, setUserId] = useState(() => {
-    return localStorage.getItem("userId") || "";
-  });
-
+  const [name, setName] = useState(localStorage.getItem("name") || "");
+  const [isSharing, setIsSharing] = useState(false);
   const [location, setLocation] = useState(null);
-  const [peerLocation, setPeerLocation] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const watchIdRef = useRef(null);
 
-  const peerId = userId === "userA" ? "userB" : "userA";
+  // Save name if not set
+  const handleNameSubmit = () => {
+    const finalName = name.trim() || generateName();
+    localStorage.setItem("name", finalName);
+    setName(finalName);
+  };
 
-  // Watch and upload my location
-  useEffect(() => {
-    if (!userId) return;
-
-    const watchId = navigator.geolocation.watchPosition(
+  // Start live sharing
+  const startSharing = () => {
+    if (!name) return alert("Enter your name first!");
+    const id = navigator.geolocation.watchPosition(
       (pos) => {
         const coords = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
+          name,
+          lastUpdated: Date.now(),
         };
         setLocation(coords);
-        setDoc(doc(db, "locations", userId), coords);
+        setDoc(doc(db, "locations", name), coords);
       },
       (err) => console.error("Geolocation error", err),
       { enableHighAccuracy: true }
     );
+    watchIdRef.current = id;
+    setIsSharing(true);
+  };
 
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, [userId]);
+  // Stop sharing
+  const stopSharing = () => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+    }
+    deleteDoc(doc(db, "locations", name));
+    setIsSharing(false);
+  };
 
-  // Listen to peer's location
+  // Listen for all active users
   useEffect(() => {
-    if (!userId) return;
-
-    const unsubscribe = onSnapshot(doc(db, "locations", peerId), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setPeerLocation({ lat: data.lat, lng: data.lng });
-      }
+    const unsubscribe = onSnapshot(collection(db, "locations"), (snap) => {
+      const users = [];
+      snap.forEach((doc) => {
+        if (doc.id !== name) {
+          users.push(doc.data());
+        }
+      });
+      setAllUsers(users);
     });
-
     return () => unsubscribe();
-  }, [userId, peerId]);
+  }, [name]);
 
   return (
-    <>
-      {!userId ? (
-        <div style={{ padding: "1rem" }}>
-          <h2>Select your user ID</h2>
-          <select
-            onChange={(e) => {
-              setUserId(e.target.value);
-              localStorage.setItem("userId", e.target.value);
-            }}
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Choose one
-            </option>
-            <option value="userA">userA</option>
-            <option value="userB">userB</option>
-          </select>
+    <div style={{ padding: "1rem" }}>
+      {!name ? (
+        <div>
+          <h2>👤 Enter your name</h2>
+          <input
+            type="text"
+            placeholder="Your name (or leave blank)"
+            onChange={(e) => setName(e.target.value)}
+            style={{ marginRight: "1rem" }}
+          />
+          <button onClick={handleNameSubmit}>Continue</button>
         </div>
       ) : (
-        <div style={{ padding: "1rem" }}>
-          <h2>📍 My Location ({userId})</h2>
-          <pre>{JSON.stringify(location, null, 2)}</pre>
+        <div>
+          <h2>Welcome, {name}</h2>
+          <button onClick={isSharing ? stopSharing : startSharing}>
+            {isSharing ? "⛔ Stop Sharing" : "📡 Start Sharing"}
+          </button>
 
-          <h2>👀 Peer Location ({peerId})</h2>
-          <pre>{JSON.stringify(peerLocation, null, 2)}</pre>
-
-          <MapView myLocation={location} peerLocation={peerLocation} />
+          <MapView myLocation={location} otherUsers={allUsers} />
         </div>
       )}
-    </>
+    </div>
   );
 }

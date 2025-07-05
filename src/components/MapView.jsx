@@ -1,9 +1,17 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Tooltip,
+  useMap,
+  Popup,
+  useMap,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
 
-// Fix leaflet icon path bug
+// Leaflet icon patch
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -14,19 +22,18 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// Helper to move the map when your location changes
-function RecenterOnLocation({ latlng }) {
+function Recenter({ latlng }) {
   const map = useMap();
   useEffect(() => {
     if (latlng) {
-      map.setView(latlng, map.getZoom());
+      map.setView(latlng, 15);
     }
-  }, [latlng, map]);
+  }, [latlng]);
   return null;
 }
 
-export default function MapView({ myLocation, peerLocation }) {
-  const center = myLocation || { lat: 40.7128, lng: -74.006 }; // fallback to NYC
+export default function MapView({ myLocation, otherUsers }) {
+  const center = myLocation || { lat: 40.7128, lng: -74.006 };
 
   return (
     <MapContainer
@@ -35,23 +42,22 @@ export default function MapView({ myLocation, peerLocation }) {
       style={{ height: "400px", width: "100%", marginTop: "1rem" }}
     >
       <TileLayer
-        attribution='&copy; <a href="https://osm.org">OpenStreetMap</a> contributors'
+        attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-
-      <RecenterOnLocation latlng={myLocation} />
+      <Recenter latlng={myLocation} />
 
       {myLocation && (
         <Marker position={myLocation}>
-          <Popup>🚩 You</Popup>
+          <Popup>📍 You ({myLocation.name})</Popup>
         </Marker>
       )}
 
-      {peerLocation && (
-        <Marker position={peerLocation}>
-          <Popup>👀 Peer</Popup>
+      {otherUsers.map((user, i) => (
+        <Marker key={i} position={{ lat: user.lat, lng: user.lng }}>
+          <Popup>👤 {user.name}</Popup>
         </Marker>
-      )}
+      ))}
     </MapContainer>
   );
 }
